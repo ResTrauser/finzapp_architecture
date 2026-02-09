@@ -38,4 +38,4 @@ The documentation is available in both English and Spanish.
 3.  **Product Mindset:** Every line of code must serve a business purpose (ROI, Retention, Trust).
 
 ---
-*Built with ❤️ by the FinzApp Engineering Team.*
+*Built with ❤️ by the FinzApp Team.*
