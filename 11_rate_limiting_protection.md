@@ -4,6 +4,9 @@
 
 Sin protección, tu base de datos y tu presupuesto de nube podrían colapsar en minutos. En `finzapp_api`, implementamos **Rate Limiting dinámico** como primera línea de defensa.
 
+### 🏢 Contexto Real: Protección contra Abusos
+Los ataques de "Credential Stuffing" (bots probando miles de contraseñas filtradas) son una amenaza constante para cualquier API pública. Sin limitación, un ataque de este tipo puede saturar la base de datos y denegar el servicio a usuarios legítimos. Implementar Rate Limiting le permite al sistema defenderse automáticamente, permitiendo por ejemplo solo 5 intentos fallidos por IP cada 10 minutos, neutralizando bots sin afectar la experiencia de los usuarios reales.
+
 ### 🧱 El Guardián: `rate_limit.py`
 Usamos un Middleware que actúa antes de que la petición llegue siquiera a la lógica de negocio.
 
@@ -20,6 +23,42 @@ if current_usage >= limit:
     raise RateLimitExceededException()
 else:
     await redis.incr(user_key)
+```
+
+```mermaid
+graph TD
+    Request[Incoming Request] --> Check{Check Redis Count}
+    Check -- "< Limit" --> Incr[Increment Counter]
+    Incr --> Allow[Allow Request]
+    Check -- ">= Limit" --> Block[Block Request]
+    Block --> Response[429 Too Many Requests]
+    
+    Allow --> App[Business Logic]
+
+    style Block fill:#ffcdd2,stroke:#b71c1c
+    style Allow fill:#c8e6c9,stroke:#2e7d32
+```
+
+### ⏳ Atomicity in Motion
+El uso de scripts LUA o comandos atómicos en Redis es clave para evitar condiciones de carrera.
+
+```mermaid
+sequenceDiagram
+    participant Middleware
+    participant Redis
+    
+    Middleware->>Redis: INCR user_ip:127.0.0.1
+    Redis-->>Middleware: (int) 1
+    
+    alt If Count == 1
+        Middleware->>Redis: EXPIRE user_ip:127.0.0.1 60
+    end
+    
+    opt If Count > Limit
+        Middleware-->>User: 429 Too Many Requests
+    end
+    
+    note over Redis: All operations are fast\n(sub-millisecond)
 ```
 
 ### 🚀 Por qué es un Skill de "System Design" Senior

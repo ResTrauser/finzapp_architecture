@@ -4,6 +4,9 @@ Uno de los mayores retos en una arquitectura **Vertical Slice** (o en cualquier 
 
 En `finzapp_api`, la solución fue el **Patrón Observer**.
 
+### 🏢 Contexto Real: Procesos con Efectos Secundarios
+En flujos críticos como el registro de usuarios, a menudo se acumulan requisitos secundarios: enviar correos de bienvenida, notificar a ventas, verificar listas de cumplimiento, etc. Acoplar todas estas llamadas dentro del servicio principal puede degradar severamente la performance y la fiabilidad (si el servicio de correo falla, el registro falla). Usando el patrón Observer, el proceso principal se mantiene rápido (ej. 200ms) y todos los efectos secundarios ocurren de manera asíncrona y desacoplada, sin bloquear al usuario ni poner en riesgo la transacción principal.
+
 ### 🧩 El Problema
 Supongamos que cuando un usuario se registra (`Identity Slice`), necesitamos:
 1. Enviar un correo de bienvenida.
@@ -24,6 +27,64 @@ Implementé un sistema de eventos centralizado en `src/core/patterns/observer.py
    # En Identity Service
    self.notifier.notify(UserRegisteredEvent(user_id=new_user.id))
    ```
+
+```mermaid
+sequenceDiagram
+    participant User as Client
+    participant Identity as Identity Slice
+    participant EventBus as Event Bus
+    participant Email as Email Service
+    participant Workspace as Workspace Service
+
+    User->>Identity: Register User
+    Identity->>Identity: Create User in DB
+    Identity->>EventBus: notify(UserRegisteredEvent)
+    
+    par Async Processing
+        EventBus->>Email: handle(UserRegisteredEvent)
+        Email->>Email: Send Welcome Email
+    and
+        EventBus->>Workspace: handle(UserRegisteredEvent)
+        Workspace->>Workspace: Create Default Workspace
+    end
+    
+    Identity-->>User: 201 Created
+```
+
+### 🏗️ Diseño de Clases (Event Bus)
+La implementación interna utiliza tipos genéricos para asegurar que los eventos coincidan con sus manejadores.
+
+```mermaid
+classDiagram
+    class DomainEvent {
+        <<Abstract>>
+        +occurred_on: DateTime
+    }
+    class UserRegisteredEvent {
+        +user_id: string
+        +email: string
+    }
+    
+    class EventHandler {
+        <<Interface>>
+        +handle(event: T)
+    }
+    class EmailNotifierHandler {
+        +handle(event: UserRegisteredEvent)
+    }
+    
+    class EventBus {
+        -subscribers: Dict
+        +subscribe(EventType, Handler)
+        +publish(DomainEvent)
+    }
+    
+    DomainEvent <|-- UserRegisteredEvent
+    EventHandler <|-- EmailNotifierHandler
+    EventBus o-- EventHandler : manages >
+    
+    note for EventBus "Singleton / Scoped\nInjected via Dependency Injection"
+```
 
 ### 🚀 Beneficios Senior
 - **Extensibilidad**: Si mañana necesito añadir una cuarta acción al registro, NO toco el código del `Identity Slice`. Solo creo un nuevo suscriptor.
