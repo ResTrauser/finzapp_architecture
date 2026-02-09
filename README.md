@@ -37,12 +37,5 @@ The documentation is available in both English and Spanish.
 2.  **Modular Monolith:** We deploy a single unit but maintain strict logical boundaries.
 3.  **Product Mindset:** Every line of code must serve a business purpose (ROI, Retention, Trust).
 
-## 🚀 Contributing
-
-This repository serves as a living document of our architectural evolution. Changes to these records should follow the standard ADR process:
-1.  Fork the repository.
-2.  Create a new ADR file using the template.
-3.  Submit a Pull Request for team review.
-
 ---
 *Built with ❤️ by the FinzApp Engineering Team.*
